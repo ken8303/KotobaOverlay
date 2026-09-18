@@ -1,0 +1,3 @@
+// Set your registered reverse-DNS bundle ID and Apple Developer team here.
+PRODUCT_BUNDLE_IDENTIFIER = com.example.KotobaOverlay
+DEVELOPMENT_TEAM =
