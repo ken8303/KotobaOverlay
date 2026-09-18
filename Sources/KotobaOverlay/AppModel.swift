@@ -15,16 +15,17 @@ import ApplicationServices
     @Published var subtitlesOnly = true { didSet {
         guard subtitlesOnly != oldValue, videoMode else { return }
         let resume = running
-        stop(); updateVideoCrop()
+        // Tracked video crops are recomputed by the capture loop after restart.
+        stop()
         if resume { start() }
     } }
     private var effectiveAreaRect: CGRect? {
         areaRect.map { videoCaptureRect($0, subtitlesOnly: videoMode && subtitlesOnly) }
     }
-    func updateVideoCrop() {
+    func updateScreenAreaCrop() {
         guard !videoMode else { return }
         guard let screen = areaScreen, let rect = effectiveAreaRect, let old = selection else { return }
-        selection = CaptureChoice(id: old.id, name: videoMode ? "Video area" : "Screen area", window: nil, display: old.display, crop: captureCrop(rect, screenHeight: screen.frame.height))
+        selection = CaptureChoice(id: old.id, name: "Screen area", window: nil, display: old.display, crop: captureCrop(rect, screenHeight: screen.frame.height))
     }
     func selectVideo() { videoMode = true; selectRegion() }
     @Published var excludeInputFields = true
@@ -209,7 +210,7 @@ import ApplicationServices
                 do {
                     self.selection = try await (self.videoMode ? self.capture.videoChoice(screen: screen, rect: rect) : self.capture.regionChoice(screen: screen, rect: rect))
                     self.areaScreen = screen; self.areaRect = rect
-                    self.updateVideoCrop()
+                    self.updateScreenAreaCrop()
                     self.editingArea = false; self.resumeAfterAreaEdit = false; self.areaFrameVisible = true
                     if self.videoMode { self.areaFrame.hide() } else { self.updateAreaFrame() }
                     self.status = self.videoMode ? "Video selected. Enable visible captions in the player, hide its controls, then start." : "Area selected. Drag Move or any edge to adjust it anytime."

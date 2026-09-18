@@ -1,0 +1,21 @@
+name: macOS regression checks
+# Requires an explicitly configured, trusted macOS 27 runner with Xcode 27.
+# Manual dispatch avoids executing untrusted PR code on a personal Mac.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: [self-hosted, macOS, kotoba-macos27]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify runtime
+        run: |
+          test "$(sw_vers -productVersion | cut -d. -f1)" -ge 27
+          xcodebuild -version
+      - name: Regression tests and release source parity
+        run: ./script/test.sh
+      - name: Build release artifact
+        run: xcodebuild -project KotobaOverlay.xcodeproj -scheme KotobaOverlay -configuration Release CODE_SIGNING_ALLOWED=NO build

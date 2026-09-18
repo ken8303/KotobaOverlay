@@ -73,3 +73,7 @@ Validation: 12 targeted tests passed. These include 30,000 simulated resampling 
 ### Review update (build 5)
 
 Audio teardown now coalesces concurrent Stop/error cleanup and awaits final cue delivery. Stopped subtitles clear correctly, text-mode changes redraw immediately, and SRT export validates malformed timing/text. See REVIEW.md for findings, validation and remaining release checks.
+
+### Build 6 follow-up
+
+Adds hotkey cleanup, an audio overlay display picker and content sizing, a pending-translation queue, and removal of the unnecessary legacy speech authorization gate. Use `./script/test.sh` for regression checks and `./script/test.sh --integration` before release. See RELEASE-CHECKS.md for signing, sandbox-download validation, manual CI setup and remaining limitations.

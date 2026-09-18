@@ -31,12 +31,15 @@ import UniformTypeIdentifiers
     @Published var configuration: TranslationSession.Configuration?
     @Published var subtitle = ""
     @Published var showOverlay = true { didSet { updateOverlay() } }
+    @Published var overlayDisplayID: UInt32 = 0 { didSet { updateOverlay() } }
+    var overlayScreens: [NSScreen] { NSScreen.screens }
     private var recorder = AppAudioCapture()
     private var display: SCDisplay?
     private var panel: NSPanel?
     private var generation = 0
     private var stopRequested = false
     private var captureFailure: String?
+    private var pendingCues = PendingCueQueue()
     private var displayedCue: UUID?
     private var overlayExpiry: Task<Void, Never>?
     private var sessionSource: String?
@@ -54,19 +57,13 @@ import UniformTypeIdentifiers
         if !cues.isEmpty && (sessionSource != source || sessionTarget != target) {
             status = "Start a new timeline before changing languages."; return
         }
-        busy = true; stopRequested = false; captureFailure = nil; generation += 1; let current = generation
-        status = "Checking speech permission…"
-        Task {
-            let authorization = await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
-            }
-            guard current == generation else { return }
-            if stopRequested { busy = false; status = "Cancelled."; return }
-            guard authorization == .authorized else { busy = false; status = "Enable Speech Recognition for Kotoba in System Settings → Privacy & Security."; return }
-            configuration = TranslationSession.Configuration(source: Locale.Language(identifier: source), target: Locale.Language(identifier: target), preferredStrategy: .lowLatency)
-            configuration?.invalidate()
-        }
+        busy = true; stopRequested = false; captureFailure = nil; generation += 1
+        status = "Preparing on-device speech…"
+        // SpeechAnalyzer runs on device and does not use SFSpeechRecognizer authorization.
+        configuration = TranslationSession.Configuration(source: Locale.Language(identifier: source), target: Locale.Language(identifier: target), preferredStrategy: .lowLatency)
+        configuration?.invalidate()
     }
+
     func run(using session: TranslationSession) async {
         let current = generation
         do {
@@ -89,8 +86,8 @@ import UniformTypeIdentifiers
                 await MainActor.run {
                     guard let self, self.generation == current else { return }
                     self.cues.append(cue)
-                    self.cues.sort { $0.start < $1.start }
-                    if self.cues.filter({ $0.translated == nil }).count >= 100 {
+                    self.pendingCues.append(self.cues.count - 1)
+                    if self.pendingCues.count >= 100 {
                         self.status = "Translation is falling behind. Capture paused; finishing queued cues."
                         self.stop()
                     }
@@ -106,11 +103,12 @@ import UniformTypeIdentifiers
             guard current == generation, !Task.isCancelled, !stopRequested else { throw CancellationError() }
             capturing = true; status = "Listening to \(app.applicationName) · microphone off"
             while current == generation && !Task.isCancelled {
-                if let index = cues.firstIndex(where: { $0.translated == nil }) {
+                if let index = pendingCues.first {
                     let id = cues[index].id
                     let response = try await session.translate(cues[index].original)
-                    guard current == generation, let slot = cues.firstIndex(where: { $0.id == id }) else { return }
-                    cues[slot].translated = response.targetText
+                    guard current == generation, cues.indices.contains(index), cues[index].id == id else { return }
+                    cues[index].translated = response.targetText
+                    pendingCues.finishFirst()
                     displayedCue = id
                     refreshSubtitle()
                     overlayExpiry?.cancel()
@@ -145,7 +143,7 @@ import UniformTypeIdentifiers
     func newTimeline() {
         guard !busy else { return }
         generation += 1; recorder = AppAudioCapture(); cues = []; firstTimestamp = ""; subtitle = ""
-        sessionSource = nil; sessionTarget = nil; clearOverlay()
+        sessionSource = nil; sessionTarget = nil; pendingCues = PendingCueQueue(); clearOverlay()
         status = "New timeline. Start playback and capture together."
     }
     func export() {
@@ -174,7 +172,7 @@ import UniformTypeIdentifiers
         updateOverlay()
     }
     private func updateOverlay() {
-        guard busy, showOverlay, !subtitle.isEmpty, let screen = NSScreen.main else { panel?.orderOut(nil); return }
+        guard busy, showOverlay, !subtitle.isEmpty, let screen = NSScreen.screens.first(where: { $0.displayID == overlayDisplayID }) ?? NSScreen.main else { panel?.orderOut(nil); return }
         if panel == nil {
             let p = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             p.level = .floating; p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -182,8 +180,15 @@ import UniformTypeIdentifiers
             p.ignoresMouseEvents = true; p.hidesOnDeactivate = false; panel = p
         }
         let width = min(900, screen.visibleFrame.width - 40)
-        panel?.setFrame(CGRect(x: screen.visibleFrame.midX - width / 2, y: screen.visibleFrame.minY + 45, width: width, height: 150), display: true)
-        panel?.contentView = NSHostingView(rootView: Text(subtitle).font(.system(size: 26, weight: .medium)).multilineTextAlignment(.center).foregroundStyle(.white).padding(16).frame(maxWidth: .infinity, maxHeight: .infinity).background(.black.opacity(0.85)).clipShape(RoundedRectangle(cornerRadius: 12)))
+        let content = NSHostingView(rootView: Text(subtitle).font(.system(size: 26, weight: .medium)).multilineTextAlignment(.center).foregroundStyle(.white).padding(16).frame(width: width).fixedSize(horizontal: false, vertical: true).background(.black.opacity(0.85)).clipShape(RoundedRectangle(cornerRadius: 12)))
+        content.setFrameSize(NSSize(width: width, height: 1))
+        let height = min(max(80, content.fittingSize.height), screen.visibleFrame.height * 0.6)
+        panel?.setFrame(CGRect(x: screen.visibleFrame.midX - width / 2, y: screen.visibleFrame.minY + 45, width: width, height: height), display: true)
+        panel?.contentView = content
         panel?.orderFrontRegardless()
     }
+}
+
+extension NSScreen {
+    var displayID: UInt32 { (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0 }
 }

@@ -54,4 +54,19 @@ final class SubtitleTimelineTests: XCTestCase {
         let result = try SubtitleTimeline.srt([TimedSubtitle(start: 1, end: 1.0001, original: "Hi")], firstStart: nil, mode: .original)
         XCTAssertTrue(result.contains("00:00:01,000 --> 00:00:01,001"))
     }
+    func testPendingQueueRetainsFailedCueAndCompactsWithoutDroppingWork() {
+        var queue = PendingCueQueue()
+        for index in 0..<2000 { queue.append(index) }
+        XCTAssertEqual(queue.first, 0)
+        // A failed translation leaves the first item available for retry.
+        XCTAssertEqual(queue.first, 0)
+        for index in 0..<2000 {
+            XCTAssertEqual(queue.first, index)
+            queue.finishFirst()
+        }
+        XCTAssertEqual(queue.count, 0)
+        XCTAssertNil(queue.first)
+        queue.append(2000)
+        XCTAssertEqual(queue.first, 2000)
+    }
 }

@@ -59,3 +59,19 @@ enum SubtitleTimeline {
         }.joined(separator: "\n")
     }
 }
+
+/// Stable cue indices stay pending until translation succeeds, including across stop/retry.
+struct PendingCueQueue {
+    private var indices: [Int] = []
+    private var head = 0
+    var count: Int { indices.count - head }
+    var first: Int? { head < indices.count ? indices[head] : nil }
+    mutating func append(_ index: Int) { indices.append(index) }
+    mutating func finishFirst() {
+        guard head < indices.count else { return }
+        head += 1
+        if head >= 256 && head * 2 >= indices.count {
+            indices.removeFirst(head); head = 0
+        }
+    }
+}

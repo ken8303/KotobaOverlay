@@ -24,7 +24,15 @@ struct LiveAudioView: View {
                 Picker("To", selection: $model.target) { ForEach(languages, id: \.self) { Text(label($0)).tag($0) } }
             }.disabled(model.busy || !model.cues.isEmpty)
             Text(model.checkingSpeech ? "Checking speech languages…" : "Speech models download automatically on Start when needed.").font(.caption).foregroundStyle(.secondary)
-            Toggle("Show live subtitle overlay", isOn: $model.showOverlay)
+            HStack {
+                Toggle("Show live subtitle overlay", isOn: $model.showOverlay)
+                Picker("Display", selection: $model.overlayDisplayID) {
+                    Text("Active display").tag(UInt32(0))
+                    ForEach(model.overlayScreens, id: \.displayID) { screen in
+                        Text(screen.localizedName).tag(screen.displayID)
+                    }
+                }
+            }
             HStack {
                 Button(model.capturing ? "Stop & finish subtitles" : (model.busy ? "Preparing / finishing…" : "Start audio subtitles")) { model.capturing ? model.stop() : model.start() }
                     .buttonStyle(.borderedProminent).disabled(model.stopping || (!model.capturing && (model.busy || model.selectedPID == 0 || model.checkingSpeech || !model.supportsSpeech(model.source))))

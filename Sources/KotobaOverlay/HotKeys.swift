@@ -9,19 +9,31 @@ import Carbon
         guard handler == nil else { return }
         self.action = action
         var type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, event, context in
+        let installed = InstallEventHandler(GetApplicationEventTarget(), { _, event, context in
             guard let event, let context else { return OSStatus(eventNotHandledErr) }
             var identifier = EventHotKeyID()
-            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &identifier)
+            guard GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &identifier) == noErr else { return OSStatus(eventNotHandledErr) }
             let hotkeys = Unmanaged<HotKeys>.fromOpaque(context).takeUnretainedValue()
             let id = identifier.id
-            Task { @MainActor in hotkeys.action?(id) }
+            Task { @MainActor [weak hotkeys] in hotkeys?.action?(id) }
             return noErr
         }, 1, &type, Unmanaged.passUnretained(self).toOpaque(), &handler)
+        guard installed == noErr else { self.action = nil; return }
         for (id, key) in [(UInt32(1), UInt32(kVK_ANSI_T)), (2, UInt32(kVK_ANSI_H)), (3, UInt32(kVK_ANSI_R)), (4, UInt32(kVK_ANSI_E))] {
             var reference: EventHotKeyRef?
             let result = RegisterEventHotKey(key, UInt32(controlKey | optionKey), EventHotKeyID(signature: 0x4B4F544F, id: id), GetApplicationEventTarget(), 0, &reference)
             if result == noErr, let reference { references.append(reference) }
         }
+    }
+    func unregister() {
+        for reference in references { UnregisterEventHotKey(reference) }
+        references.removeAll()
+        if let handler { RemoveEventHandler(handler) }
+        handler = nil
+        action = nil
+    }
+    deinit {
+        for reference in references { UnregisterEventHotKey(reference) }
+        if let handler { RemoveEventHandler(handler) }
     }
 }

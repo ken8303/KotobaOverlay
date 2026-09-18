@@ -28,3 +28,7 @@ Unsigned Release archive succeeded. Twelve targeted tests passed, including four
 ## Review fixes — build 5
 
 38 targeted SwiftPM tests passed, including concurrent stop/final-delivery coordination, invalid SRT values, blank translation rejection, chronological offset selection and positive submillisecond export durations. Existing audio clock, locale, video geometry and regression helpers remain passing. Unsigned Release archive succeeded. See REVIEW.md for fixed defects and remaining runtime/release checks. Vision integration tests were excluded from this targeted run; their earlier failures remain unresolved.
+
+## Build 6 follow-up
+
+39 targeted tests passed; full integration run executed 42 tests with the same three Vision failures. Unsigned Xcode Release archive succeeded. Source membership check and shell syntax checks passed. No signed runtime, multi-display UI, asset download, CI execution or App Store validation was performed. See RELEASE-CHECKS.md.
