@@ -32,3 +32,7 @@ Unsigned Release archive succeeded. Twelve targeted tests passed, including four
 ## Build 6 follow-up
 
 39 targeted tests passed; full integration run executed 42 tests with the same three Vision failures. Unsigned Xcode Release archive succeeded. Source membership check and shell syntax checks passed. No signed runtime, multi-display UI, asset download, CI execution or App Store validation was performed. See RELEASE-CHECKS.md.
+
+## Build 7 — 2 October 2026
+
+41 targeted tests passed. Full suite: 44 tests, three existing Vision GenericObjCError failures. Unsigned Release archive succeeded. See REVIEW-BUILD7.md for lifecycle and empty-translation fixes and remaining limitations.

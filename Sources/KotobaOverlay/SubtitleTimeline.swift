@@ -75,3 +75,11 @@ struct PendingCueQueue {
         }
     }
 }
+
+func validatedSubtitleTranslation(_ text: String) throws -> String {
+    let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !clean.isEmpty else {
+        throw NSError(domain: "KotobaTranslation", code: 1, userInfo: [NSLocalizedDescriptionKey: "Translation returned empty text. The cue is kept pending; retry capture or export Original."])
+    }
+    return clean
+}

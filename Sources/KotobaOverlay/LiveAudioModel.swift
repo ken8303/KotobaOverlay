@@ -37,6 +37,7 @@ import UniformTypeIdentifiers
     private var display: SCDisplay?
     private var panel: NSPanel?
     private var generation = 0
+    private var runActive = false
     private var stopRequested = false
     private var captureFailure: String?
     private var pendingCues = PendingCueQueue()
@@ -60,11 +61,17 @@ import UniformTypeIdentifiers
         busy = true; stopRequested = false; captureFailure = nil; generation += 1
         status = "Preparing on-device speech…"
         // SpeechAnalyzer runs on device and does not use SFSpeechRecognizer authorization.
-        configuration = TranslationSession.Configuration(source: Locale.Language(identifier: source), target: Locale.Language(identifier: target), preferredStrategy: .lowLatency)
-        configuration?.invalidate()
+        if configuration != nil && sessionSource == source && sessionTarget == target {
+            configuration?.invalidate()
+        } else {
+            configuration = TranslationSession.Configuration(source: Locale.Language(identifier: source), target: Locale.Language(identifier: target), preferredStrategy: .lowLatency)
+        }
     }
 
     func run(using session: TranslationSession) async {
+        guard busy, !stopRequested, !runActive else { return }
+        runActive = true
+        defer { runActive = false }
         let current = generation
         do {
             status = "Preparing translation languages…"
@@ -78,13 +85,13 @@ import UniformTypeIdentifiers
             sessionSource = source; sessionTarget = target
             recorder.onStatus = { [weak self] message in
                 Task { @MainActor in
-                    guard let self, self.generation == current else { return }
+                    guard let self, self.generation == current, self.busy else { return }
                     self.status = message
                 }
             }
             recorder.onCue = { [weak self] cue in
                 await MainActor.run {
-                    guard let self, self.generation == current else { return }
+                    guard let self, self.generation == current, self.busy else { return }
                     self.cues.append(cue)
                     self.pendingCues.append(self.cues.count - 1)
                     if self.pendingCues.count >= 100 {
@@ -95,7 +102,7 @@ import UniformTypeIdentifiers
             }
             recorder.onFailure = { [weak self] message in
                 Task { @MainActor in
-                    guard let self, self.generation == current else { return }
+                    guard let self, self.generation == current, self.busy else { return }
                     self.captureFailure = message; self.status = message; self.stop()
                 }
             }
@@ -107,7 +114,8 @@ import UniformTypeIdentifiers
                     let id = cues[index].id
                     let response = try await session.translate(cues[index].original)
                     guard current == generation, cues.indices.contains(index), cues[index].id == id else { return }
-                    cues[index].translated = response.targetText
+                    let translated = try validatedSubtitleTranslation(response.targetText)
+                    cues[index].translated = translated
                     pendingCues.finishFirst()
                     displayedCue = id
                     refreshSubtitle()
@@ -129,7 +137,11 @@ import UniformTypeIdentifiers
     func stop() {
         guard !stopping else { return }
         if !capturing {
-            if busy { stopRequested = true; configuration = nil; status = "Cancelling…" }
+            if busy {
+                stopRequested = true; configuration = nil
+                if runActive { status = "Cancelling…" }
+                else { generation += 1; busy = false; status = "Cancelled." }
+            }
             panel?.orderOut(nil); return
         }
         stopping = true
@@ -142,7 +154,7 @@ import UniformTypeIdentifiers
     }
     func newTimeline() {
         guard !busy else { return }
-        generation += 1; recorder = AppAudioCapture(); cues = []; firstTimestamp = ""; subtitle = ""
+        generation += 1; configuration = nil; recorder = AppAudioCapture(); cues = []; firstTimestamp = ""; subtitle = ""
         sessionSource = nil; sessionTarget = nil; pendingCues = PendingCueQueue(); clearOverlay()
         status = "New timeline. Start playback and capture together."
     }

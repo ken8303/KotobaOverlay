@@ -69,4 +69,25 @@ final class SubtitleTimelineTests: XCTestCase {
         queue.append(2000)
         XCTAssertEqual(queue.first, 2000)
     }
+    func testEmptyTranslationRemainsRetryable() throws {
+        var queue = PendingCueQueue()
+        queue.append(0)
+        XCTAssertThrowsError(try validatedSubtitleTranslation(" \n\r"))
+        XCTAssertEqual(queue.first, 0)
+        XCTAssertEqual(try validatedSubtitleTranslation("  Hello\n"), "Hello")
+    }
+    @MainActor func testCancelBeforeTranslationTaskStartsAllowsRestart() {
+        let model = LiveAudioModel()
+        model.speechLocales = [Locale(identifier: "ja_JP")]
+        model.selectedPID = 123
+        model.start()
+        XCTAssertTrue(model.busy)
+        model.stop()
+        XCTAssertFalse(model.busy)
+        XCTAssertNil(model.configuration)
+        model.start()
+        XCTAssertTrue(model.busy)
+        XCTAssertNotNil(model.configuration)
+        model.stop()
+    }
 }
