@@ -113,4 +113,36 @@ final class SubtitleTimelineTests: XCTestCase {
             XCTFail("Must cancel")
         } catch { XCTAssertTrue(error is CancellationError); XCTAssertEqual(attempts, 1) }
     }
+    func testExplicitMissingPoliciesPreserveTimingAndDoNotDuplicateOriginal() throws {
+        var bad = TimedSubtitle(start: 5, end: 6, original: "Music")
+        bad.translationFailure = "Unsupported"
+        let good = TimedSubtitle(start: 8, end: 9, original: "Hello", translated: "Bonjour")
+        XCTAssertThrowsError(try SubtitleTimeline.srt([bad, good], firstStart: 0, mode: .both)) { error in
+            XCTAssertTrue(error.localizedDescription.contains("1 failed and 0 pending"))
+        }
+        let skipped = try SubtitleTimeline.srt([bad, good], firstStart: 0, mode: .translated, missingPolicy: .skip)
+        XCTAssertEqual(skipped, "1\n00:00:03,000 --> 00:00:04,000\nBonjour\n")
+        let fallback = try SubtitleTimeline.srt([bad], firstStart: nil, mode: .both, missingPolicy: .original)
+        XCTAssertEqual(fallback, "1\n00:00:05,000 --> 00:00:06,000\nMusic\n")
+        XCTAssertThrowsError(try SubtitleTimeline.srt([bad], firstStart: nil, mode: .translated, missingPolicy: .skip))
+    }
+    func testOCRCooldownDoesNotDelayNewLines() {
+        let now = Date(timeIntervalSince1970: 100)
+        var state = OCRRetryState()
+        state.begin(visible: ["bad"])
+        state.fail("bad", message: "Model missing", now: now)
+        XCTAssertEqual(state.passDelay, 1)
+        state.begin(visible: ["bad", "new"])
+        XCTAssertFalse(state.canAttempt("bad", now: now.addingTimeInterval(1)))
+        XCTAssertTrue(state.canAttempt("new", now: now.addingTimeInterval(1)))
+        XCTAssertEqual(state.passDelay, 0)
+        XCTAssertEqual(state.lastError, "Model missing")
+        XCTAssertTrue(state.canAttempt("bad", now: now.addingTimeInterval(10)))
+        state.succeed("bad")
+        XCTAssertNil(state.lastError)
+        state.fail("gone", message: "Error", now: now)
+        state.begin(visible: [])
+        XCTAssertTrue(state.canAttempt("gone", now: now))
+        XCTAssertNil(state.lastError)
+    }
 }

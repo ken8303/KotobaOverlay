@@ -463,7 +463,7 @@
 				<key>MARKETING_VERSION</key>
 				<string>1.0</string>
 				<key>CURRENT_PROJECT_VERSION</key>
-				<string>8</string>
+				<string>9</string>
 				<key>SWIFT_ACTIVE_COMPILATION_CONDITIONS</key>
 				<string>$(inherited) APP_STORE DEBUG</string>
 				<key>SWIFT_OPTIMIZATION_LEVEL</key>
@@ -527,7 +527,7 @@
 				<key>MARKETING_VERSION</key>
 				<string>1.0</string>
 				<key>CURRENT_PROJECT_VERSION</key>
-				<string>8</string>
+				<string>9</string>
 				<key>SWIFT_ACTIVE_COMPILATION_CONDITIONS</key>
 				<string>$(inherited) APP_STORE</string>
 				<key>SWIFT_OPTIMIZATION_LEVEL</key>

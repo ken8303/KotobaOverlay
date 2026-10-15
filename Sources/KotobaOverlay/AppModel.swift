@@ -71,7 +71,7 @@ import ApplicationServices
     private let overlay = OverlayController()
     private let selector = RegionSelector()
     private var loop: Task<Void, Never>?
-    private var lineRetryAfter: [String: Date] = [:]
+    private var lineRetry = OCRRetryState()
     private var translationTask: Task<Void, Never>?
     private var retryTranslationAfter = Date.distantPast
     private var session: TranslationSession?
@@ -383,11 +383,11 @@ import ApplicationServices
             defer {
                 if let self, self.revision == current { self.translationTask = nil }
             }
-            var failed = false
+            guard let self else { return }
+            self.lineRetry.begin(visible: Set(self.latestLines.map(\.text)))
             for line in missing {
-                guard let self, !Task.isCancelled, self.revision == current, self.running else { return }
-                self.lineRetryAfter = self.lineRetryAfter.filter { Set(self.latestLines.map(\.text)).contains($0.key) }
-                if let next = self.lineRetryAfter[line], next > Date() { failed = true; continue }
+                guard !Task.isCancelled, self.revision == current, self.running else { return }
+                if !self.lineRetry.canAttempt(line, now: Date()) { continue }
                 do {
                     let response = try await session.translate(line)
                     let translated = try validatedSubtitleTranslation(response.targetText)
@@ -395,17 +395,16 @@ import ApplicationServices
                     self.cache.insert(translated, for: line, protecting: Set(self.latestLines.map(\.text)))
                     self.history.append(source: sourceCode, target: targetCode, original: line, translated: translated)
                     self.historyCount = self.history.records.count
-                    self.lineRetryAfter.removeValue(forKey: line)
+                    self.lineRetry.succeed(line)
                     self.refreshPositionedTranslations()
                 } catch {
                     guard !Task.isCancelled, self.revision == current else { return }
-                    failed = true
-                    self.lineRetryAfter[line] = Date().addingTimeInterval(10)
+                    self.lineRetry.fail(line, message: error.localizedDescription, now: Date())
                 }
             }
-            guard let self, self.revision == current else { return }
-            self.retryTranslationAfter = Date().addingTimeInterval(failed ? 1 : 0)
-            self.status = failed ? "Some text could not be translated · other lines continue" : "Live · on device"
+            guard self.revision == current else { return }
+            self.retryTranslationAfter = Date().addingTimeInterval(self.lineRetry.passDelay)
+            self.status = self.lineRetry.lastError.map { "Some text could not be translated: " + $0 } ?? "Live · on device"
         }
     }
 }

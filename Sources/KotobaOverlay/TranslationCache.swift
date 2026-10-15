@@ -19,3 +19,24 @@ struct TranslationCache {
 
     mutating func removeAll() { values.removeAll(); order.removeAll() }
 }
+
+struct OCRRetryState {
+    private var deadlines: [String: Date] = [:]
+    private(set) var lastError: String?
+    private(set) var failedThisPass = false
+    mutating func begin(visible: Set<String>) {
+        deadlines = deadlines.filter { visible.contains($0.key) }
+        failedThisPass = false
+        if deadlines.isEmpty { lastError = nil }
+    }
+    func canAttempt(_ text: String, now: Date) -> Bool { (deadlines[text] ?? .distantPast) <= now }
+    mutating func fail(_ text: String, message: String, now: Date) {
+        deadlines[text] = now.addingTimeInterval(10)
+        lastError = message; failedThisPass = true
+    }
+    mutating func succeed(_ text: String) {
+        deadlines.removeValue(forKey: text)
+        if deadlines.isEmpty { lastError = nil }
+    }
+    var passDelay: TimeInterval { failedThisPass ? 1 : 0 }
+}

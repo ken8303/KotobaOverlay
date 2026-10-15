@@ -81,3 +81,7 @@ Adds hotkey cleanup, an audio overlay display picker and content sizing, a pendi
 ### Build 8
 
 Failed audio translations no longer block later cues: after three attempts they are marked failed and remain available in Original export. OCR isolates failed lines with a cooldown. Includes OCR cancellation propagation, region-aware speech selection, selection-window improvements and complete concurrency diagnostics. See REVIEW-BUILD8.md for remaining work and validation limits.
+
+### Build 9
+
+SRT export now offers explicit choices to skip untranslated cues or use their source text, with timing gaps preserved. OCR cooldowns no longer delay unrelated new lines and retain diagnostic errors. Area selection uses a nonactivating panel. See REVIEW-BUILD9.md.

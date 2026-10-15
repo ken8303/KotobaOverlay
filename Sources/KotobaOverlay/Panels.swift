@@ -80,10 +80,10 @@ final class TranslationCanvas: NSView {
     private var windows: [NSWindow] = []
     func select(completion: @escaping (NSScreen, CGRect) -> Void) {
         cancel()
-        NSApp.activate(ignoringOtherApps: true)
         for screen in NSScreen.screens {
-            let window = SelectionWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+            let window = SelectionWindow(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            window.hidesOnDeactivate = false
             window.level = .screenSaver
             window.backgroundColor = .clear
             window.isOpaque = false
@@ -98,7 +98,7 @@ final class TranslationCanvas: NSView {
     }
     func cancel() { windows.forEach { $0.orderOut(nil) }; windows.removeAll() }
 }
-final class SelectionWindow: NSWindow {
+final class SelectionWindow: NSPanel {
     override var canBecomeKey: Bool { true }
 }
 final class SelectionView: NSView {

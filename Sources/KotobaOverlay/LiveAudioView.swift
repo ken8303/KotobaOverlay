@@ -53,6 +53,10 @@ struct LiveAudioView: View {
                     TextField("First subtitle starts at HH:MM:SS,mmm", text: $model.firstTimestamp)
                     Text("Leave blank for captured timing. Setting the first start shifts every cue equally, preserving gaps and duration. Use a new timeline after seeking in the video; this cannot correct playback-speed drift.").font(.caption).foregroundStyle(.secondary)
                     Picker("Text", selection: $model.textMode) { ForEach(SubtitleTextMode.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
+                    Picker("Untranslated cues", selection: $model.missingCuePolicy) {
+                        ForEach(MissingCuePolicy.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }.disabled(model.textMode == .original)
+                    Text("Skipping preserves timing gaps. Using original includes the source text once for each untranslated cue.").font(.caption).foregroundStyle(.secondary)
                     HStack {
                         Button("Export SRT…") { model.export() }.disabled(model.cues.isEmpty || model.busy)
                         Button("New timeline…") { model.confirmClear = true }.disabled(model.busy || model.cues.isEmpty)

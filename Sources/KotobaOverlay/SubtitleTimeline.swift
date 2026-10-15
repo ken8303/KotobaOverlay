@@ -13,13 +13,19 @@ struct TimedSubtitle: Identifiable, Equatable {
     }
 }
 enum SubtitleTextMode: String, CaseIterable { case translated = "Translation", original = "Original", both = "Both" }
+enum MissingCuePolicy: String, CaseIterable {
+    case requireAll = "Require all translations"
+    case skip = "Skip untranslated cues"
+    case original = "Use original for untranslated cues"
+}
 enum SubtitleExportError: LocalizedError {
-    case invalidTime, missingTranslations, invalidCue
+    case invalidTime, missingTranslations(failed: Int, pending: Int), invalidCue, noExportableCues
     var errorDescription: String? {
         switch self {
         case .invalidCue: return "A subtitle has an invalid time range or empty text. It cannot be exported as SRT."
         case .invalidTime: return "Enter a valid time as HH:MM:SS,mmm (for example 00:01:20,000)."
-        case .missingTranslations: return "Some cues are still untranslated. Finish translation or export Original."
+        case let .missingTranslations(failed, pending): return "\(failed) failed and \(pending) pending cues. Choose Skip untranslated cues, Use original for untranslated cues, or export Original."
+        case .noExportableCues: return "No translated cues remain to export. Choose Use original for untranslated cues or export Original."
         }
     }
 }
@@ -39,21 +45,29 @@ enum SubtitleTimeline {
         let ms = Int((value * 1000).rounded())
         return String(format: "%02d:%02d:%02d,%03d", ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000)
     }
-    static func srt(_ cues: [TimedSubtitle], firstStart: Double?, mode: SubtitleTextMode) throws -> String {
+    static func srt(_ cues: [TimedSubtitle], firstStart: Double?, mode: SubtitleTextMode, missingPolicy: MissingCuePolicy = .requireAll) throws -> String {
         guard !cues.isEmpty else { return "" }
         guard cues.allSatisfy({ $0.start.isFinite && $0.end.isFinite && $0.start >= 0 && $0.end > $0.start && $0.end <= 3_599_999.999 && !$0.original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else { throw SubtitleExportError.invalidCue }
         if let firstStart, !firstStart.isFinite || firstStart < 0 || firstStart > 3_599_999.999 { throw SubtitleExportError.invalidTime }
-        let cues = cues.sorted { $0.start < $1.start }
+        var cues = cues.sorted { $0.start < $1.start }
         let first = cues[0]
         let offset = (firstStart ?? first.start) - first.start
-        if mode != .original && cues.contains(where: { ($0.translated ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) { throw SubtitleExportError.missingTranslations }
+        let missing = cues.filter { ($0.translated ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if mode != .original && !missing.isEmpty && missingPolicy == .requireAll {
+            let failed = missing.filter { $0.translationFailure != nil }.count
+            throw SubtitleExportError.missingTranslations(failed: failed, pending: missing.count - failed)
+        }
+        // Compute offset from the original first cue before skipping any cues.
+        cues = mode != .original && missingPolicy == .skip ? cues.filter { !missing.contains($0) } : cues
+        guard !cues.isEmpty else { throw SubtitleExportError.noExportableCues }
         guard cues.allSatisfy({ $0.end + offset <= 3_599_999.999 && (($0.start + offset) * 1000).rounded() < 3_599_999_999 }) else { throw SubtitleExportError.invalidTime }
         return cues.enumerated().map { index, cue in
             let text: String
+            let translated = (cue.translated ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             switch mode {
             case .original: text = cue.original
-            case .translated: text = cue.translated ?? ""
-            case .both: text = cue.original + "\n" + (cue.translated ?? "")
+            case .translated: text = translated.isEmpty ? cue.original : translated
+            case .both: text = translated.isEmpty ? cue.original : cue.original + "\n" + translated
             }
             let clean = text.replacingOccurrences(of: "\r", with: "").components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.joined(separator: "\n")
             return "\(index + 1)\n\(timestamp(cue.start + offset)) --> \(timestamp(max(cue.end + offset, ((cue.start + offset) * 1000).rounded() / 1000 + 0.001)))\n\(clean)\n"
@@ -80,7 +94,7 @@ struct PendingCueQueue {
 func validatedSubtitleTranslation(_ text: String) throws -> String {
     let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !clean.isEmpty else {
-        throw NSError(domain: "KotobaTranslation", code: 1, userInfo: [NSLocalizedDescriptionKey: "Translation returned empty text. The cue is kept pending; retry capture or export Original."])
+        throw NSError(domain: "KotobaTranslation", code: 1, userInfo: [NSLocalizedDescriptionKey: "Translation returned empty text."])
     }
     return clean
 }

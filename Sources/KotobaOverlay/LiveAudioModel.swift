@@ -26,6 +26,7 @@ import UniformTypeIdentifiers
     @Published var stopping = false
     @Published var status = "Choose the application playing your video."
     @Published var cues: [TimedSubtitle] = []
+    @Published var missingCuePolicy: MissingCuePolicy = .requireAll
     @Published var firstTimestamp = ""
     @Published var textMode: SubtitleTextMode = .both { didSet { refreshSubtitle() } }
     @Published var configuration: TranslationSession.Configuration?
@@ -120,7 +121,7 @@ import UniformTypeIdentifiers
                         cues[index].translated = translated
                     } catch is CancellationError { throw CancellationError() }
                     catch {
-                        guard current == generation else { return }
+                        guard current == generation, cues.indices.contains(index), cues[index].id == id else { return }
                         cues[index].translationFailure = error.localizedDescription
                         pendingCues.finishFirst()
                         status = "A cue could not be translated after 3 attempts; capture continues. Export Original to retain all cues."
@@ -173,7 +174,7 @@ import UniformTypeIdentifiers
     func export() {
         do {
             let first = firstTimestamp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : try SubtitleTimeline.parse(firstTimestamp)
-            let text = try SubtitleTimeline.srt(cues, firstStart: first, mode: textMode)
+            let text = try SubtitleTimeline.srt(cues, firstStart: first, mode: textMode, missingPolicy: missingCuePolicy)
             let save = NSSavePanel(); save.nameFieldStringValue = "Kotoba-Subtitles.srt"
             save.allowedContentTypes = [UTType(filenameExtension: "srt") ?? .plainText]
             save.begin { response in

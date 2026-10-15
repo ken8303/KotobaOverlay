@@ -40,3 +40,7 @@ Unsigned Release archive succeeded. Twelve targeted tests passed, including four
 ## Build 8 — 15 October 2026
 
 Full suite: 47 tests passed, including the three previously failing Vision tests. Unsigned Release archive succeeded. Complete concurrency checking is enabled, with remaining TranslationSession isolation warnings recorded rather than suppressed. See REVIEW-BUILD8.md for resolved and outstanding review findings.
+
+## Build 9
+
+49 tests passed, including Vision integration and new explicit export policy and OCR cooldown tests. Unsigned Release archive succeeded. Interactive nonactivating-panel behavior and signed audio capture remain unverified. See REVIEW-BUILD9.md.
