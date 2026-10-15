@@ -250,6 +250,7 @@ import ApplicationServices
     func toggleAreaEditing() { areaFrameVisible = true; updateAreaFrame() }
     func toggleOverlay() { overlayVisible.toggle(); if overlayVisible { overlay.show(model: self) } else { overlay.hide() } }
     func stop() {
+        lineRetry = OCRRetryState()
         startAfterDownload = false
         retryTranslationAfter = .distantPast
         stopRevision += 1

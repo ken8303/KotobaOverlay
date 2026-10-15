@@ -44,3 +44,7 @@ Full suite: 47 tests passed, including the three previously failing Vision tests
 ## Build 9
 
 49 tests passed, including Vision integration and new explicit export policy and OCR cooldown tests. Unsigned Release archive succeeded. Interactive nonactivating-panel behavior and signed audio capture remain unverified. See REVIEW-BUILD9.md.
+
+## Build 10
+
+All 49 tests passed; unsigned Release archive succeeded. Updates export wording, the captured-cue time label, Stop retry-state cleanup and the SRT skip filter. See REVIEW-BUILD10.md.

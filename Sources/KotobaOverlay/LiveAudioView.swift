@@ -45,13 +45,13 @@ struct LiveAudioView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(SubtitleTimeline.timestamp(cue.start)) → \(SubtitleTimeline.timestamp(cue.end))").font(.caption.monospaced()).foregroundStyle(.secondary)
                     Text(cue.original)
-                    Text(cue.translated ?? cue.translationFailure.map { "Translation failed: " + $0 + " · Export Original to keep this cue." } ?? "Waiting for translation…").foregroundStyle(.secondary)
+                    Text(cue.translated ?? cue.translationFailure.map { "Translation failed: " + $0 + " · Choose Skip or Use original in Untranslated cues when exporting." } ?? "Waiting for translation…").foregroundStyle(.secondary)
                 }
             }.frame(height: 190)
             GroupBox("SRT timeline & export") {
                 VStack(alignment: .leading, spacing: 10) {
-                    TextField("First subtitle starts at HH:MM:SS,mmm", text: $model.firstTimestamp)
-                    Text("Leave blank for captured timing. Setting the first start shifts every cue equally, preserving gaps and duration. Use a new timeline after seeking in the video; this cannot correct playback-speed drift.").font(.caption).foregroundStyle(.secondary)
+                    TextField("First captured cue starts at HH:MM:SS,mmm", text: $model.firstTimestamp)
+                    Text("Leave blank for captured timing. This time refers to the first captured cue, even if it is skipped on export. Skipping it means the first exported cue starts later. All cues shift equally, preserving gaps and duration. Use a new timeline after seeking in the video; this cannot correct playback-speed drift.").font(.caption).foregroundStyle(.secondary)
                     Picker("Text", selection: $model.textMode) { ForEach(SubtitleTextMode.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented)
                     Picker("Untranslated cues", selection: $model.missingCuePolicy) {
                         ForEach(MissingCuePolicy.allCases, id: \.self) { Text($0.rawValue).tag($0) }

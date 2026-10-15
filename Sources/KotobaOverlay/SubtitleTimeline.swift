@@ -58,7 +58,8 @@ enum SubtitleTimeline {
             throw SubtitleExportError.missingTranslations(failed: failed, pending: missing.count - failed)
         }
         // Compute offset from the original first cue before skipping any cues.
-        cues = mode != .original && missingPolicy == .skip ? cues.filter { !missing.contains($0) } : cues
+        let missingIDs = Set(missing.map(\.id))
+        cues = mode != .original && missingPolicy == .skip ? cues.filter { !missingIDs.contains($0.id) } : cues
         guard !cues.isEmpty else { throw SubtitleExportError.noExportableCues }
         guard cues.allSatisfy({ $0.end + offset <= 3_599_999.999 && (($0.start + offset) * 1000).rounded() < 3_599_999_999 }) else { throw SubtitleExportError.invalidTime }
         return cues.enumerated().map { index, cue in

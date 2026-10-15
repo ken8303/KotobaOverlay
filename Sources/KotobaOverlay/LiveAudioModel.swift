@@ -124,7 +124,7 @@ import UniformTypeIdentifiers
                         guard current == generation, cues.indices.contains(index), cues[index].id == id else { return }
                         cues[index].translationFailure = error.localizedDescription
                         pendingCues.finishFirst()
-                        status = "A cue could not be translated after 3 attempts; capture continues. Export Original to retain all cues."
+                        status = "A cue could not be translated after 3 attempts; capture continues. Choose Skip or Use original in Untranslated cues when exporting."
                         continue
                     }
                     pendingCues.finishFirst()
