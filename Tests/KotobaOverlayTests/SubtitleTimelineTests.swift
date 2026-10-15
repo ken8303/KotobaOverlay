@@ -90,4 +90,27 @@ final class SubtitleTimelineTests: XCTestCase {
         XCTAssertNotNil(model.configuration)
         model.stop()
     }
+    @MainActor func testRetryStopsAfterThreeAttemptsAndNextCueCanSucceed() async throws {
+        var attempts = 0
+        do {
+            _ = try await translateWithRetry({ attempts += 1; return " " }, pause: {})
+            XCTFail("Blank cue should fail")
+        } catch { XCTAssertEqual(attempts, 3) }
+        let next = try await translateWithRetry({ "Next cue" }, pause: {})
+        XCTAssertEqual(next, "Next cue")
+    }
+    @MainActor func testTransientFailureRecoversAndCancellationIsNotRetried() async throws {
+        var attempts = 0
+        let text = try await translateWithRetry({
+            attempts += 1
+            return attempts == 1 ? "" : "Recovered"
+        }, pause: {})
+        XCTAssertEqual(text, "Recovered")
+        XCTAssertEqual(attempts, 2)
+        attempts = 0
+        do {
+            _ = try await translateWithRetry({ attempts += 1; throw CancellationError() }, pause: {})
+            XCTFail("Must cancel")
+        } catch { XCTAssertTrue(error is CancellationError); XCTAssertEqual(attempts, 1) }
+    }
 }

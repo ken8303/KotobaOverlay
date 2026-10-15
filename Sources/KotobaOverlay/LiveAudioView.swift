@@ -45,7 +45,7 @@ struct LiveAudioView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(SubtitleTimeline.timestamp(cue.start)) → \(SubtitleTimeline.timestamp(cue.end))").font(.caption.monospaced()).foregroundStyle(.secondary)
                     Text(cue.original)
-                    Text(cue.translated ?? "Waiting for translation…").foregroundStyle(.secondary)
+                    Text(cue.translated ?? cue.translationFailure.map { "Translation failed: " + $0 + " · Export Original to keep this cue." } ?? "Waiting for translation…").foregroundStyle(.secondary)
                 }
             }.frame(height: 190)
             GroupBox("SRT timeline & export") {

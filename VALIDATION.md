@@ -36,3 +36,7 @@ Unsigned Release archive succeeded. Twelve targeted tests passed, including four
 ## Build 7 — 2 October 2026
 
 41 targeted tests passed. Full suite: 44 tests, three existing Vision GenericObjCError failures. Unsigned Release archive succeeded. See REVIEW-BUILD7.md for lifecycle and empty-translation fixes and remaining limitations.
+
+## Build 8 — 15 October 2026
+
+Full suite: 47 tests passed, including the three previously failing Vision tests. Unsigned Release archive succeeded. Complete concurrency checking is enabled, with remaining TranslationSession isolation warnings recorded rather than suppressed. See REVIEW-BUILD8.md for resolved and outstanding review findings.

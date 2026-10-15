@@ -5,6 +5,7 @@ struct TimedSubtitle: Identifiable, Equatable {
     let start: Double
     let end: Double
     let original: String
+    var translationFailure: String?
     var translated: String?
     init(start: Double, end: Double, original: String, translated: String? = nil) {
         self.id = UUID(); self.start = start; self.end = end
@@ -82,4 +83,19 @@ func validatedSubtitleTranslation(_ text: String) throws -> String {
         throw NSError(domain: "KotobaTranslation", code: 1, userInfo: [NSLocalizedDescriptionKey: "Translation returned empty text. The cue is kept pending; retry capture or export Original."])
     }
     return clean
+}
+
+/// A bad cue must not prevent later cues from being translated.
+@MainActor func translateWithRetry(_ operation: () async throws -> String,
+                                  pause: () async throws -> Void = { try await Task.sleep(for: .milliseconds(250)) }) async throws -> String {
+    for attempt in 0..<3 {
+        try Task.checkCancellation()
+        do { return try validatedSubtitleTranslation(try await operation()) }
+        catch {
+            if error is CancellationError || Task.isCancelled { throw CancellationError() }
+            if attempt == 2 { throw error }
+            try await pause()
+        }
+    }
+    throw CancellationError()
 }

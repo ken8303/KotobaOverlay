@@ -71,6 +71,7 @@ import ApplicationServices
     private let overlay = OverlayController()
     private let selector = RegionSelector()
     private var loop: Task<Void, Never>?
+    private var lineRetryAfter: [String: Date] = [:]
     private var translationTask: Task<Void, Never>?
     private var retryTranslationAfter = Date.distantPast
     private var session: TranslationSession?
@@ -106,7 +107,10 @@ import ApplicationServices
             default: break
             }
         }
-        languages = await LanguageAvailability(preferredStrategy: .lowLatency).supportedLanguages.map { $0.minimalIdentifier }.sorted { label($0) < label($1) }
+        let available = await Task.detached {
+            await LanguageAvailability(preferredStrategy: .lowLatency).supportedLanguages.map { $0.minimalIdentifier }
+        }.value
+        languages = available.sorted { label($0) < label($1) }
         ocrLanguages = (try? VNRecognizeTextRequest().supportedRecognitionLanguages()) ?? []
         if !languages.contains(target) {
             let wanted = Locale.Language(identifier: target)
@@ -379,22 +383,29 @@ import ApplicationServices
             defer {
                 if let self, self.revision == current { self.translationTask = nil }
             }
-            do {
-                let requests = missing.enumerated().map { TranslationSession.Request(sourceText: $0.element, clientIdentifier: String($0.offset)) }
-                for try await response in session.translate(batch: requests) {
-                    guard let self, !Task.isCancelled, self.revision == current, self.running else { return }
-                    self.cache.insert(response.targetText, for: response.sourceText, protecting: Set(self.latestLines.map(\.text)))
-                    self.history.append(source: sourceCode, target: targetCode, original: response.sourceText, translated: response.targetText)
+            var failed = false
+            for line in missing {
+                guard let self, !Task.isCancelled, self.revision == current, self.running else { return }
+                self.lineRetryAfter = self.lineRetryAfter.filter { Set(self.latestLines.map(\.text)).contains($0.key) }
+                if let next = self.lineRetryAfter[line], next > Date() { failed = true; continue }
+                do {
+                    let response = try await session.translate(line)
+                    let translated = try validatedSubtitleTranslation(response.targetText)
+                    guard !Task.isCancelled, self.revision == current, self.running else { return }
+                    self.cache.insert(translated, for: line, protecting: Set(self.latestLines.map(\.text)))
+                    self.history.append(source: sourceCode, target: targetCode, original: line, translated: translated)
                     self.historyCount = self.history.records.count
+                    self.lineRetryAfter.removeValue(forKey: line)
                     self.refreshPositionedTranslations()
+                } catch {
+                    guard !Task.isCancelled, self.revision == current else { return }
+                    failed = true
+                    self.lineRetryAfter[line] = Date().addingTimeInterval(10)
                 }
-                guard let self, self.revision == current else { return }
-                self.status = "Live · on device"
-            } catch {
-                guard let self, !Task.isCancelled, self.revision == current else { return }
-                self.retryTranslationAfter = Date().addingTimeInterval(1)
-                self.status = "Translation interrupted · retrying… \(error.localizedDescription)"
             }
+            guard let self, self.revision == current else { return }
+            self.retryTranslationAfter = Date().addingTimeInterval(failed ? 1 : 0)
+            self.status = failed ? "Some text could not be translated · other lines continue" : "Live · on device"
         }
     }
 }

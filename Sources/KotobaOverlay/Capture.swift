@@ -117,12 +117,13 @@ struct OCRReading: Sendable {
         return bitmap
     }
     nonisolated static func recognize(_ image: CGImage, language: String) async throws -> OCRReading {
-        try await Task.detached(priority: .userInitiated) {
-            try autoreleasepool {
-            let request = VNRecognizeTextRequest()
-            request.recognitionLevel = .accurate
-            request.usesLanguageCorrection = true
-            request.recognitionLanguages = [language]
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+        request.recognitionLanguages = [language]
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            return try autoreleasepool {
             do {
                 try VNImageRequestHandler(cgImage: image).perform([request])
             } catch {
@@ -130,12 +131,19 @@ struct OCRReading: Sendable {
                 let bitmap = try recognitionBitmap(image)
                 try VNImageRequestHandler(cgImage: bitmap).perform([request])
             }
+            try Task.checkCancellation()
             let lines: [OCRLine] = (request.results ?? []).compactMap { observation in
                 guard let text = observation.topCandidates(1).first else { return nil }
                 return OCRLine(text: text.string, rect: observation.boundingBox, confidence: text.confidence)
             }.sorted { $0.rect.midY > $1.rect.midY }
             return OCRReading(lines: lines)
             }
-        }.value
+        }
+        return try await withTaskCancellationHandler {
+            try await worker.value
+        } onCancel: {
+            worker.cancel()
+            request.cancel()
+        }
     }
 }

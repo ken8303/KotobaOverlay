@@ -32,7 +32,7 @@ import Carbon
         handler = nil
         action = nil
     }
-    deinit {
+    isolated deinit {
         for reference in references { UnregisterEventHotKey(reference) }
         if let handler { RemoveEventHandler(handler) }
     }

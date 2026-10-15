@@ -90,8 +90,9 @@ import UniformTypeIdentifiers
                 }
             }
             recorder.onCue = { [weak self] cue in
+                guard let self else { return }
                 await MainActor.run {
-                    guard let self, self.generation == current, self.busy else { return }
+                    guard self.generation == current, self.busy else { return }
                     self.cues.append(cue)
                     self.pendingCues.append(self.cues.count - 1)
                     if self.pendingCues.count >= 100 {
@@ -112,10 +113,19 @@ import UniformTypeIdentifiers
             while current == generation && !Task.isCancelled {
                 if let index = pendingCues.first {
                     let id = cues[index].id
-                    let response = try await session.translate(cues[index].original)
-                    guard current == generation, cues.indices.contains(index), cues[index].id == id else { return }
-                    let translated = try validatedSubtitleTranslation(response.targetText)
-                    cues[index].translated = translated
+                    do {
+                        let original = cues[index].original
+                        let translated = try await translateWithRetry { try await session.translate(original).targetText }
+                        guard current == generation, cues.indices.contains(index), cues[index].id == id else { return }
+                        cues[index].translated = translated
+                    } catch is CancellationError { throw CancellationError() }
+                    catch {
+                        guard current == generation else { return }
+                        cues[index].translationFailure = error.localizedDescription
+                        pendingCues.finishFirst()
+                        status = "A cue could not be translated after 3 attempts; capture continues. Export Original to retain all cues."
+                        continue
+                    }
                     pendingCues.finishFirst()
                     displayedCue = id
                     refreshSubtitle()
@@ -128,6 +138,8 @@ import UniformTypeIdentifiers
                 else { try await Task.sleep(for: .milliseconds(100)) }
             }
             if current == generation { status = captureFailure ?? "Stopped · \(cues.count) timed cues ready to export." }
+        } catch is CancellationError {
+            if current == generation { status = "Cancelled." }
         } catch {
             if current == generation { status = "Audio subtitles: \(error.localizedDescription)" + (cues.contains { $0.translated == nil } ? " Untranslated cues can be exported as Original." : "") }
         }

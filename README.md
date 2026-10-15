@@ -77,3 +77,7 @@ Audio teardown now coalesces concurrent Stop/error cleanup and awaits final cue 
 ### Build 6 follow-up
 
 Adds hotkey cleanup, an audio overlay display picker and content sizing, a pending-translation queue, and removal of the unnecessary legacy speech authorization gate. Use `./script/test.sh` for regression checks and `./script/test.sh --integration` before release. See RELEASE-CHECKS.md for signing, sandbox-download validation, manual CI setup and remaining limitations.
+
+### Build 8
+
+Failed audio translations no longer block later cues: after three attempts they are marked failed and remain available in Original export. OCR isolates failed lines with a cooldown. Includes OCR cancellation propagation, region-aware speech selection, selection-window improvements and complete concurrency diagnostics. See REVIEW-BUILD8.md for remaining work and validation limits.

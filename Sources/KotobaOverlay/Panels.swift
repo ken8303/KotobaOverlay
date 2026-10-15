@@ -80,8 +80,10 @@ final class TranslationCanvas: NSView {
     private var windows: [NSWindow] = []
     func select(completion: @escaping (NSScreen, CGRect) -> Void) {
         cancel()
+        NSApp.activate(ignoringOtherApps: true)
         for screen in NSScreen.screens {
             let window = SelectionWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             window.level = .screenSaver
             window.backgroundColor = .clear
             window.isOpaque = false
@@ -100,6 +102,7 @@ final class SelectionWindow: NSWindow {
     override var canBecomeKey: Bool { true }
 }
 final class SelectionView: NSView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     var finished: ((CGRect?) -> Void)?
     private var start: CGPoint?
     private var box = CGRect.zero

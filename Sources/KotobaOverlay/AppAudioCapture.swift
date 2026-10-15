@@ -4,10 +4,13 @@ import Speech
 import AVFoundation
 import CoreMedia
 
-func matchingSpeechLocale(_ code: String, supported: [Locale]) -> Locale? {
+func matchingSpeechLocale(_ code: String, supported: [Locale], preferred: Locale = .current) -> Locale? {
     let wanted = Locale.Language(identifier: code)
     return supported.first { $0.identifier.replacingOccurrences(of: "_", with: "-") == code }
-        ?? supported.sorted { $0.identifier < $1.identifier }.first {
+        ?? supported.sorted {
+            let left = $0.region == preferred.region, right = $1.region == preferred.region
+            return left != right ? left : $0.identifier < $1.identifier
+        }.first {
             $0.language.languageCode == wanted.languageCode &&
             (wanted.script == nil || $0.language.script == wanted.script)
         }
